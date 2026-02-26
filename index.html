@@ -1,70 +1,136 @@
-<!DOCTYPE html>
-<html lang="uz">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Choyxona Menu</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f4; padding: 10px; margin: 0; }
-        .header { text-align: center; padding: 10px; color: #2c3e50; }
-        .card { background: #fff; border-radius: 12px; padding: 10px; margin-bottom: 15px; display: flex; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .card img { width: 85px; height: 85px; border-radius: 10px; object-fit: cover; }
-        .info { margin-left: 15px; flex-grow: 1; }
-        .info h3 { margin: 0; font-size: 17px; }
-        .price { color: #e67e22; font-weight: bold; margin-top: 5px; }
-        .btn { background: #2ecc71; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        .btn:active { transform: scale(0.95); }
-        .cart-bar { position: fixed; bottom: 15px; left: 15px; right: 15px; background: #2c3e50; color: white; padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-    </style>
-</head>
-<body>
-    <div class="header"><h2>🔥 Choyxona Menyusi</h2></div>
+import asyncio
+import sqlite3
+import json
+from datetime import datetime
+from aiogram import Bot, Dispatcher, F
+from aiogram.filters import Command
+from aiogram.types import (
+    Message, WebAppInfo, ReplyKeyboardMarkup, 
+    KeyboardButton, ReplyKeyboardRemove
+)
+
+# --- SOZLAMALAR ---
+API_TOKEN = '8671171107:AAGtDCyrSXcO726BV0WiaiUCIReN2XQDsYM'
+ADMIN_ID = 513150881 
+
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher()
+
+# --- MA'LUMOTLAR BAZASI ---
+def init_db():
+    conn = sqlite3.connect('choyxona.db')
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users 
+                      (user_id INTEGER PRIMARY KEY, full_name TEXT, phone TEXT)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS orders 
+                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                       user_id INTEGER, items TEXT, total_price INTEGER, date TEXT)''')
+    conn.commit()
+    conn.close()
+
+def get_user(user_id):
+    conn = sqlite3.connect('choyxona.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+# --- TUGMALAR ---
+def get_main_menu():
+    web_url = "https://mavlonovdiyorbek57-cmd.github.io/menu/" 
+    return ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="📋 Menyu", web_app=WebAppInfo(url=web_url))],
+        [KeyboardButton(text="📦 Buyurtmalarim"), KeyboardButton(text="🌟 Fikr qoldirish")]
+    ], resize_keyboard=True)
+
+def get_register_kb():
+    return ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="📱 Telefon raqamni yuborish", request_contact=True)]
+    ], resize_keyboard=True)
+
+# --- HANDLERLAR ---
+
+@dp.message(Command("start"))
+async def start_cmd(message: Message):
+    init_db()
+    user = get_user(message.from_user.id)
     
-    <div class="card">
-        <img src="https://img.freepik.com/free-photo/shish-kebab-with-onion-greens-top-view_141793-13271.jpg" alt="G'ijduvon">
-        <div class="info">
-            <h3>G'ijduvon Shashlik</h3>
-            <div class="price">13 000 so'm</div>
-        </div>
-        <button class="btn" onclick="addToCart('Gijduvon', 13000)">➕ Qo'shish</button>
-    </div>
+    if user:
+        # Agar foydalanuvchi bazada bo'lsa, menyuni chiqaramiz
+        await message.answer(
+            f"Xush kelibsiz, {user[1]}! 👋\nBuyurtma berishni boshlashingiz mumkin.",
+            reply_markup=get_main_menu()
+        )
+    else:
+        # Agar bazada bo'lmasa, ro'yxatdan o'tishni so'raymiz
+        await message.answer(
+            "Assalomu alaykum! Botdan foydalanish uchun ro'yxatdan o'tishingiz kerak.\n\n"
+            "Pastdagi tugmani bosib telefon raqamingizni yuboring 👇",
+            reply_markup=get_register_kb()
+        )
 
-    <div class="card">
-        <img src="https://images.unsplash.com/photo-1560611580-b9f07a4e81c2?q=80&w=1000&auto=format&fit=crop" alt="Kuskovoy">
-        <div class="info">
-            <h3>Kuskovoy Shashlik</h3>
-            <div class="price">15 500 so'm</div>
-        </div>
-        <button class="btn" onclick="addToCart('Kuskovoy', 15500)">➕ Qo'shish</button>
-    </div>
+@dp.message(F.contact)
+async def handle_contact(message: Message):
+    # Foydalanuvchini bazaga saqlash
+    user_id = message.from_user.id
+    full_name = message.from_user.full_name
+    phone = message.contact.phone_number
+    
+    conn = sqlite3.connect('choyxona.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR REPLACE INTO users (user_id, full_name, phone) VALUES (?, ?, ?)', 
+                   (user_id, full_name, phone))
+    conn.commit()
+    conn.close()
+    
+    await message.answer(
+        "Muvaffaqiyatli ro'yxatdan o'tdingiz! ✅",
+        reply_markup=get_main_menu()
+    )
+    
+    # Adminga yangi mijoz haqida xabar
+    await bot.send_message(
+        ADMIN_ID, 
+        f"🆕 **Yangi mijoz!**\n👤 Ism: {full_name}\n📞 Tel: {phone}\n🆔 ID: `{user_id}`",
+        parse_mode="Markdown"
+    )
 
-    <div id="cart-bar" class="cart-bar" onclick="sendOrder()">
-        🛒 Buyurtma berish (<span id="total">0</span> so'm)
-    </div>
+@dp.message(F.web_app_data)
+async def handle_webapp_data(message: Message):
+    try:
+        data = json.loads(message.web_app_data.data)
+        user = get_user(message.from_user.id)
+        
+        items = data.get('items', 'Noma\'lum')
+        total = data.get('total_price', 0)
+        date_now = datetime.now().strftime("%d.%m.%Y %H:%M")
 
-    <script>
-        let tg = window.Telegram.WebApp;
-        tg.expand();
-        let cart = [];
-        let total = 0;
+        # Bazaga buyurtmani saqlash
+        conn = sqlite3.connect('choyxona.db')
+        cursor = conn.cursor()
+        cursor.execute('INSERT INTO orders (user_id, items, total_price, date) VALUES (?, ?, ?, ?)', 
+                       (message.from_user.id, str(items), total, date_now))
+        conn.commit()
+        conn.close()
 
-        function addToCart(name, price) {
-            cart.push(name);
-            total += price;
-            document.getElementById('cart-bar').style.display = 'block';
-            document.getElementById('total').innerText = total;
-            tg.HapticFeedback.impactOccurred('medium');
-        }
+        # Adminga buyurtma (mijoz telefoni bilan)
+        admin_text = (
+            f"🛍 **YANGI BUYURTMA!**\n\n"
+            f"👤 Mijoz: {user[1]}\n"
+            f"📞 Tel: {user[2]}\n"
+            f"🍱 Taomlar: {items}\n"
+            f"💰 Jami: {total} so'm"
+        )
+        await bot.send_message(ADMIN_ID, admin_text, parse_mode="Markdown")
+        await message.answer("Buyurtmangiz qabul qilindi! ✅")
 
-        function sendOrder() {
-            if (cart.length === 0) return;
-            tg.sendData(JSON.stringify({
-                items: cart.join(", "),
-                total_price: total
-            }));
-            tg.close();
-        }
-    </script>
-</body>
-</html>
+    except Exception as e:
+        print(f"Xato: {e}")
+
+async def main():
+    print("🚀 Bot ishga tushdi...")
+    await dp.start_polling(bot)
+
+if __name__ == '__main__':
+    asyncio.run(main())
