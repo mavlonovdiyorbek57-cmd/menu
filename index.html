@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choyxona Menu</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f4; padding: 10px; margin: 0; }
+        .header { text-align: center; padding: 10px; color: #2c3e50; }
+        .card { background: #fff; border-radius: 12px; padding: 10px; margin-bottom: 15px; display: flex; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .card img { width: 85px; height: 85px; border-radius: 10px; object-fit: cover; }
+        .info { margin-left: 15px; flex-grow: 1; }
+        .info h3 { margin: 0; font-size: 17px; }
+        .price { color: #e67e22; font-weight: bold; margin-top: 5px; }
+        .btn { background: #2ecc71; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn:active { transform: scale(0.95); }
+        .cart-bar { position: fixed; bottom: 15px; left: 15px; right: 15px; background: #2c3e50; color: white; padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+    </style>
+</head>
+<body>
+    <div class="header"><h2>🔥 Choyxona Menyusi</h2></div>
+    
+    <div class="card">
+        <img src="https://img.freepik.com/free-photo/shish-kebab-with-onion-greens-top-view_141793-13271.jpg" alt="G'ijduvon">
+        <div class="info">
+            <h3>G'ijduvon Shashlik</h3>
+            <div class="price">13 000 so'm</div>
+        </div>
+        <button class="btn" onclick="addToCart('Gijduvon', 13000)">➕ Qo'shish</button>
+    </div>
+
+    <div class="card">
+        <img src="https://images.unsplash.com/photo-1560611580-b9f07a4e81c2?q=80&w=1000&auto=format&fit=crop" alt="Kuskovoy">
+        <div class="info">
+            <h3>Kuskovoy Shashlik</h3>
+            <div class="price">15 500 so'm</div>
+        </div>
+        <button class="btn" onclick="addToCart('Kuskovoy', 15500)">➕ Qo'shish</button>
+    </div>
+
+    <div id="cart-bar" class="cart-bar" onclick="sendOrder()">
+        🛒 Buyurtma berish (<span id="total">0</span> so'm)
+    </div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+        let cart = [];
+        let total = 0;
+
+        function addToCart(name, price) {
+            cart.push(name);
+            total += price;
+            document.getElementById('cart-bar').style.display = 'block';
+            document.getElementById('total').innerText = total;
+            tg.HapticFeedback.impactOccurred('medium');
+        }
+
+        function sendOrder() {
+            if (cart.length === 0) return;
+            tg.sendData(JSON.stringify({
+                items: cart.join(", "),
+                total_price: total
+            }));
+            tg.close();
+        }
+    </script>
+</body>
+</html>
